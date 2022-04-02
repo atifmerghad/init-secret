@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: secret-manager
+  labels:
+    app: my-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: my-app
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      volumes:
+      - name: secret-volume
+        emptyDir: {}
+      initContainers:
+      - name: init-secret
+        image: srijanlabs/init-secret:latest
+        imagePullPolicy: Always
+        command: ["python"]
+        args:
+          - "secret.py"
+        env:
+        - name: SECRET_FILE_PATH
+          value: "/secret/secret.env"
+        - name: SM_DB
+          value: "demo-database-secret"
+        - name: AWS_REGION
+          value: "ap-southeast-1"
+        volumeMounts:
+          - mountPath: /secret
+            name: secret-volume
+      containers:
+      - name: main-app
+        image: busybox
+        imagePullPolicy: Always
+        command: ["/bin/sh", "-c"]
+        # Run your application command after sourcing env file or use the env file to your convenience
+        args:
+          - "source /secret/secret.env && while true; do echo '\n\n$DB_PASSWORD = '$DB_PASSWORD; echo '\nContents of secret.env file:'; cat /secret/secret.env;  sleep 2; done"
+        env:
+          - name: SECRET_FILE_PATH
+            value: "/secret/secret.env"
+        volumeMounts:
+          - mountPath: /secret
+            name: secret-volume
